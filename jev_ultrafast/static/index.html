@@ -31,6 +31,7 @@
         <div class="task-label">
           <label for="goal">Give it a task</label
           ><select id="scenario" name="scenario" aria-label="Demo scenario">
+            <option value="wikipedia">Wikipedia · real web</option>
             <option value="flights">Google Flights · real web</option>
             <option value="travel">Travel planner · fixture</option>
             <option value="research">Reading room · fixture</option>
@@ -38,12 +39,14 @@
         </div>
         <div class="task-row">
           <textarea id="goal" name="goal" rows="5">
-Find one-way flights from Zurich to London on September 20, 2026, for one adult in economy. Stop when matching flight options are visible. Do not select or book a flight.</textarea
+Search Wikipedia for Gödel’s incompleteness theorems, open the article, and confirm its title.</textarea
           ><button type="submit" id="start" class="primary">
             Start demo <span>↗</span>
           </button>
         </div>
       </form>
+      <label for="start-url">Starting URL (optional)</label>
+      <input id="start-url" type="url" placeholder="Use the selected scenario, or enter an https:// URL" />
       <div class="toolbar">
         <div class="status">
           <span class="dot" id="status-dot"></span

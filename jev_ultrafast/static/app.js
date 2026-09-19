@@ -4,6 +4,7 @@ let state = null,
   busy = false,
   automatic = false;
 const goals = {
+  wikipedia: "Search Wikipedia for Gödel’s incompleteness theorems, open the article, and confirm its title.",
   flights: 'Find one-way flights from Zurich to London on September 20, 2026, for one adult in economy. Stop when matching flight options are visible. Do not select or book a flight.',
   travel: 'Find a Design stay in Lisbon with Free cancellation and open Casa Flora.',
   research:
@@ -34,6 +35,7 @@ function controls() {
   const live = state?.page && !["done", "blocked"].includes(state.status);
   $("start").disabled = busy;
   $("scenario").disabled = busy;
+  $("start-url").disabled = busy;
   $("goal").disabled = busy;
   $("choose").disabled = busy || !live;
   $("execute").disabled = busy || !state?.decision || !live;
@@ -150,7 +152,7 @@ $("task-form").addEventListener("submit", (event) => {
   automatic = false;
   perform(
     () =>
-      call("reset", { scenario: $("scenario").value, goal: $("goal").value }),
+      call("reset", { scenario: $("scenario").value, goal: $("goal").value, url: $("start-url").value }),
     "Opening a fresh browser…",
   );
 });

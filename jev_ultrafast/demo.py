@@ -1,4 +1,4 @@
-"""Loopback-only inspector for the Jev browser agent."""
+"""Inspector with an explicit public origin and the upstream per-process CSRF token."""
 
 import atexit
 import json
@@ -15,6 +15,8 @@ from .questions import MAX_STEPS
 ROOT = Path(__file__).parent
 PORT = int(os.environ.get("TYPESAFE_DEMO_PORT", "8766"))
 ORIGIN = f"http://127.0.0.1:{PORT}"
+HOST = "127.0.0.1"
+AUTHORITY = f"127.0.0.1:{PORT}"
 TOKEN = secrets.token_urlsafe(32)
 LOCK = threading.Lock()
 AGENT = None
@@ -29,9 +31,24 @@ def load_environment():
                 os.environ.setdefault(key, value)
 
 
+def configure_hosting():
+    global PORT, ORIGIN, HOST, AUTHORITY
+    PORT = int(os.environ.get("TYPESAFE_DEMO_PORT", "8766"))
+    HOST = os.environ.get("JEV_HOST", "127.0.0.1")
+    ORIGIN = os.environ.get("JEV_PUBLIC_ORIGIN") or f"http://127.0.0.1:{PORT}"
+    parsed = urlparse(ORIGIN)
+    if (parsed.scheme not in {"http", "https"} or not parsed.hostname
+            or parsed.username or parsed.password or parsed.path or parsed.query or parsed.fragment
+            or any(c.isspace() for c in ORIGIN) or "*" in ORIGIN):
+        raise ValueError("JEV_PUBLIC_ORIGIN must be one exact http(s) origin without a trailing slash")
+    if HOST not in {"127.0.0.1", "::1", "localhost"} and not os.environ.get("JEV_PUBLIC_ORIGIN"):
+        raise ValueError("Non-loopback hosting requires JEV_PUBLIC_ORIGIN")
+    AUTHORITY = parsed.netloc
+
+
 def response_state():
     state = AGENT.snapshot() if AGENT else {"page": None, "status": "idle", "history": [], "decision": None}
-    return {**state, "text_model": os.environ.get("TEXT_MODEL", "deepseek-chat"), "max_steps": MAX_STEPS}
+    return {**state, "text_model": os.environ.get("TEXT_MODEL", "openai/gpt-5.4-nano"), "max_steps": MAX_STEPS}
 
 
 def close_browser():
@@ -45,16 +62,21 @@ def command(name, body):
     global AGENT
     if name == "reset":
         scenario = body.get("scenario", "flights")
-        if scenario not in {"travel", "research", "flights"}:
+        if scenario not in {"travel", "research", "flights", "wikipedia"}:
             raise ValueError("Unknown demo scenario")
         goal = body.get("goal", "").strip()
         if not goal or len(goal) > 2000:
             raise ValueError("Enter 1–2,000 characters")
+        url = body.get("url", "").strip() or {
+            "flights": "https://www.google.com/travel/flights?hl=en",
+            "wikipedia": "https://en.wikipedia.org/wiki/Main_Page",
+        }.get(scenario, f"{ORIGIN}/fixture.html?scenario={scenario}")
+        parsed = urlparse(url)
+        if parsed.scheme not in {"http", "https"} or not parsed.hostname or parsed.username or parsed.password:
+            raise ValueError("Starting URL must be http(s), without embedded credentials")
         close_browser()
         AGENT = Agent(
-            "https://www.google.com/travel/flights?hl=en"
-            if scenario == "flights"
-            else f"{ORIGIN}/fixture.html?scenario={scenario}",
+            url,
             goal,
             screenshots=True,
             record_dir=Path.cwd() / "artifacts" / "frames" if body.get("record") else None,
@@ -79,9 +101,11 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(content)
 
     def do_GET(self):
-        if self.headers.get("Host") != f"127.0.0.1:{PORT}":
+        if self.headers.get("Host") != AUTHORITY:
             return self.send(403, "Forbidden", "text/plain")
         path = urlparse(self.path).path
+        if path == "/healthz":
+            return self.send(200, '{"status":"ok"}')
         if path == "/api/state":
             with LOCK:
                 return self.send(200, json.dumps(response_state()))
@@ -103,7 +127,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         if (
-            self.headers.get("Host") != f"127.0.0.1:{PORT}"
+            self.headers.get("Host") != AUTHORITY
             or self.headers.get("X-Demo-Token") != TOKEN
             or self.headers.get("Origin") not in (None, ORIGIN)
         ):
@@ -130,8 +154,9 @@ class Handler(BaseHTTPRequestHandler):
 
 def main():
     load_environment()
+    configure_hosting()
     atexit.register(close_browser)
-    server = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
+    server = ThreadingHTTPServer((HOST, PORT), Handler)
     print(f"Jev Ultrafast: {ORIGIN}", flush=True)
     try:
         server.serve_forever()

@@ -190,5 +190,11 @@ def browser_operation(request):
         raise StalePage("Document is navigating")
     info["fingerprint"] = fingerprint(info)
     if request.get("screenshot", True):
-        info["screenshot"] = call("Page.captureScreenshot", format="jpeg", quality=72)["data"]
+        try:
+            info["screenshot"] = call("Page.captureScreenshot", format="jpeg", quality=72)["data"]
+        except RuntimeError as exc:
+            # Preview failure must not discard the observed page or retry a mutation.
+            if "Page.captureScreenshot timed out" not in str(exc):
+                raise
+            info["screenshot_error"] = "Screenshot timed out; page observation remains available."
     return info

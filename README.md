@@ -20,7 +20,8 @@ Give it one goal. [TypeSafe's Jev](https://docs.typesafe.ai/introduction) picks 
 
 See [UGREEN NAS deployment, acceptance, upgrade and rollback](docs/nas.md). This fork adds
 provider selection, a small official-SDK adapter, LAN-safe Inspector hosting and Docker Compose.
-The core agent loop, browser executor, snapshot and question policy are unchanged.
+The decision policy, browser mutation executor, snapshot and questions are unchanged.
+A small preview-timeout patch preserves observations and skips missing recording frames.
 
 Research checked live on **2026-09-19**, before implementation:
 

@@ -318,3 +318,37 @@ def test_navigation_during_prediction_reobserves_without_action(runner):
     assert runner.state["status"] == "ready"
     assert runner.state["decision"] is None
     runner.state["browser"].act.assert_not_called()
+
+
+def test_screenshot_timeout_keeps_observation_without_retry(monkeypatch):
+    import jev_ultrafast.browser as browser
+
+    p = page()
+    calls = Mock(side_effect=[{"result": {"value": p}},
+                             RuntimeError("Page.captureScreenshot timed out after 5s waiting for the daemon")])
+    monkeypatch.setattr(browser, "cdp", calls)
+    actual = browser_operation({"operation": "observe", "session": "test", "screenshot": True})
+    assert actual["actions"] == p["actions"]
+    assert actual["screenshot_error"]
+    assert "screenshot" not in actual
+    assert [c.args[0] for c in calls.call_args_list] == ["Runtime.evaluate", "Page.captureScreenshot"]
+
+
+def test_screenshot_non_timeout_error_is_not_swallowed(monkeypatch):
+    import jev_ultrafast.browser as browser
+
+    monkeypatch.setattr(browser, "cdp", Mock(side_effect=[{"result": {"value": page()}},
+                                                       RuntimeError("Session closed")]))
+    with pytest.raises(RuntimeError, match="Session closed"):
+        browser_operation({"operation": "observe", "session": "test", "screenshot": True})
+
+
+def test_recording_skips_missing_preview_after_action(runner, tmp_path):
+    runner.record_dir = tmp_path
+    runner.state['record'] = True
+    runner.state['decision'] = decision('e3')
+    runner.command('act', {'fingerprint': runner.state['page']['fingerprint']})
+    runner.state['browser'].act.assert_called_once()
+    assert len(runner.state['history']) == 1
+    assert runner.state['status'] == 'ready'
+    assert not list(tmp_path.iterdir())

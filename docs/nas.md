@@ -229,6 +229,22 @@ state, log rotation, and an explicit reproducible upgrade path, not unattended c
   for verification instead. Text responses reported total Gateway costs $0.0003804 and
   $0.0003848 for the first run, including $0.000225 tag-write cost per text call. The dashboard
   displayed Jev rows as $0; this rounded display is not a guarantee of permanent free pricing.
-- Remaining limitations: occasional screenshot timeout can require Resume; the inherited
+- Remaining limitations at initial acceptance: screenshot timeout required Resume; the inherited
   Chromium version needs intentional security updates/rebuilds; LAN HTTP is intended only for
   a trusted LAN. No uninterrupted long-duration soak test has been completed.
+
+
+### Screenshot timeout repair
+
+Screenshot capture is optional and is not model input. A `Page.captureScreenshot` timeout now
+preserves the successful DOM observation, without retrying any browser mutation. Other CDP
+errors still propagate. Inspector hides the absent image and overlays instead of displaying an
+old frame as current. Recording skips unavailable frames without inserting duplicates or
+changing timestamps. This requires small changes in browser.py and recording guards in
+agent.py, but does not alter the decision loop or supported operations.
+
+Repair validation: 43 offline tests, Ruff, JS syntax and package build passed. On the deployed
+NAS image, an injected capture timeout against real Trip.com preserved the DOM and ready
+state, including recording initialization; exactly one capture attempt was made. The next
+normal observation captured a real screenshot successfully. No paid model calls were used
+for this regression check.

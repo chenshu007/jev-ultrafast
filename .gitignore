@@ -8,3 +8,11 @@ artifacts/
 *.egg-info/
 
 dist/
+
+.env.*
+!.env.example
+secrets/
+chrome-profile/
+browser-harness-state/
+node_modules/
+gateway-adapter/dist/

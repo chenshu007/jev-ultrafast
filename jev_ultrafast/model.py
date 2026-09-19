@@ -7,6 +7,7 @@ import time
 
 import httpx
 
+from .providers import decision_endpoint, secret
 from .questions import NEXT_ACTION, TARGET, TEXT_VALUE
 
 CLIENT = httpx.Client(http2=True, timeout=25)
@@ -15,7 +16,7 @@ CLIENT = httpx.Client(http2=True, timeout=25)
 def post_json(url, key, body):
     for attempt in range(3):
         try:
-            response = CLIENT.post(url, json=body, headers={"Authorization": f"Bearer {key}"})
+            response = CLIENT.post(url, json=body, headers={"Authorization": f"Bearer {key}"} if key else {})
         except httpx.HTTPError:
             raise RuntimeError("Model connection failed; no action executed.") from None
         if response.status_code in {429, 529, 503} and attempt < 2:
@@ -104,8 +105,9 @@ def choose(state, goal, history):
             },
             "instructions": {"goal": goal, "operation": operation, "rules": [NEXT_ACTION, TARGET]},
         }
+    endpoint, key, decision_model = decision_endpoint()
     body = {
-        "model": os.environ.get("TYPESAFE_MODEL", "jev-latest"),
+        "model": decision_model,
         "state": {
             "page": {k: state[k] for k in ("url", "title", "text")},
             "elements": elements,
@@ -116,7 +118,7 @@ def choose(state, goal, history):
         "questions": questions,
     }
     started = time.perf_counter()
-    result = post_json("https://api.typesafe.ai/v1/systemone", os.environ["TYPESAFE_API_KEY"], body)
+    result = post_json(endpoint, key, body)
     operation_answer = validate_choice(result["answers"].get("operation", {}), operations)
     operation = operation_answer["choice"]
     target = None
@@ -158,14 +160,20 @@ def field_context(goal, action, page, history):
 
 
 def field_text(context):
-    key = os.environ.get("TEXT_MODEL_API_KEY")
+    key = secret("TEXT_MODEL_API_KEY") or secret("AI_GATEWAY_API_KEY")
     if not key:
         raise ValueError("TYPE_TEXT needs TEXT_MODEL_API_KEY; no text is hardcoded or guessed by the executor.")
-    base = os.environ.get("TEXT_MODEL_BASE_URL", "https://api.deepseek.com/v1").rstrip("/")
-    model = os.environ.get("TEXT_MODEL", "deepseek-chat")
+    base = os.environ.get("TEXT_MODEL_BASE_URL", "https://ai-gateway.vercel.sh/v1").rstrip("/")
+    model = os.environ.get("TEXT_MODEL", "openai/gpt-5.4-nano")
     reasoning = {"thinking": {"type": "disabled"}} if "api.deepseek.com/" in base else {"reasoning": {"effort": "low"}}
     if os.environ.get("TEXT_MODEL_REASONING") == "none":
         reasoning = {"reasoning": {"enabled": False}}
+    gateway_options = {}
+    if base == "https://ai-gateway.vercel.sh/v1":
+        reasoning = {"reasoning_effort": os.environ.get("TEXT_MODEL_REASONING", "none")}
+        gateway_options = {"providerOptions": {"gateway": {
+            "tags": ["app:jev-ultrafast", "host:nas", "component:type-text"],
+        }}}
     started = time.perf_counter()
     result = post_json(
         base + "/chat/completions",
@@ -175,6 +183,7 @@ def field_text(context):
             "max_tokens": 1024,
             "response_format": {"type": "json_object"},
             **reasoning,
+            **gateway_options,
             "messages": [
                 {"role": "system", "content": TEXT_VALUE},
                 {
@@ -191,6 +200,9 @@ def field_text(context):
             raise ValueError()
     except (ValueError, KeyError, TypeError):
         raise ValueError("Text helper returned no valid field value; nothing typed.") from None
+    if gateway_options:
+        print(json.dumps({"component": "type-text", "provider": "vercel", "model": model,
+                          "status": "ok", "usage": result.get("usage", {})}), flush=True)
     return value, {
         "model": model,
         "latency_ms": round((time.perf_counter() - started) * 1000),

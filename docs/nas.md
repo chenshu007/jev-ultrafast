@@ -35,8 +35,15 @@ Python retains its bounded provider retries, never retries browser mutations.
 ## Configuration and launch
 
 Verified target on 2026-09-19: `QuiteStar`, `uname -m = aarch64`, Compose v5.1.3.
-All base images support ARM64 and AMD64; Debian supplies native Chromium for both.
-Do not set `platform: linux/amd64` on the ARM NAS.
+The default now reuses the NAS-local ARM64 image
+`lscr.io/linuxserver/chromium:arm64v8-67a9c4d9-ls26` (Debian 13, Python 3.13.5).
+Its desktop `/init` is bypassed; only headless Chromium and Jev are started. The existing
+`chromium` container remains stopped and its bind-mounted `/config` and extensions are not used.
+The new container runs as image user `abc` (UID 911); its `/config` is fresh tmpfs, while
+`/data/chrome` is a separate named volume. Compose `init: true` supplies process reaping.
+The adapter reuses NAS-local `node:22-slim` (v22.23.1), satisfying the SDK's Node >=22 requirement.
+For AMD64 choose a verified compatible LinuxServer Chromium image via `CHROMIUM_IMAGE`;
+the pinned default is intentionally ARM64-only. Do not emulate AMD64 on this NAS.
 
 ```sh
 cd /volume4/Docker/jev-ultrafast
@@ -58,6 +65,12 @@ The Inspector keeps upstream's random per-process token and exact Host/Origin ch
 It is a trusted-LAN demo, not multi-user authentication: any client allowed to open the page
 can obtain the token and operate the browser. Do not publish it on the internet.
 Restart refreshes the token; reload the Inspector afterwards.
+
+On this NAS, Wikipedia direct access failed. `CHROMIUM_PROXY_SERVER` optionally passes
+Chromium's official `--proxy-server` flag. The deployed private `.env` uses the already-running
+NAS proxy `http://192.168.50.115:7890`; the repository example leaves it blank. Loopback and
+`JEV_PUBLIC_ORIGIN`'s host bypass the proxy. This setting affects only browser traffic, not
+Gateway requests, and does not modify the existing proxy service or original Chrome profile.
 
 Fill `AI_GATEWAY_API_KEY` once. `TEXT_MODEL_API_KEY` overrides it only when intentionally set.
 Default helper: `openai/gpt-5.4-nano`, `reasoning_effort=none`, JSON object response.
@@ -177,22 +190,24 @@ state, log rotation, and an explicit reproducible upgrade path, not unattended c
 - Fork creation and remote setup succeeded; core `agent.py`, `browser.py`, `snapshot.js`,
   `questions.py` are unchanged.
 - Ruff, 40 offline Python tests, 4 Node tests, JavaScript syntax checks and Python packaging passed.
-- Python/Node registry manifests and uv manifest confirm ARM64 + AMD64 availability; Debian
-  lists Chromium for both architectures. This is architecture evidence, not a successful image build.
-- NAS SSH, ARM64 architecture and Compose configuration parsing passed.
-- Follow-up NAS sudo authentication succeeded. Initial `compose ps` returned an empty stack.
-  No Jev containers were started. Container doctor, LAN runtime UI, Wikipedia, Gateway logs,
-  and restart acceptance remain **not verified**; image builds have not completed.
-- BuildKit failed obtaining Docker Hub authentication tokens because NAS DNS returned an
-  unexpected IPv6 address. A scoped existing-proxy probe reached the registry, but subsequent
-  downloads timed out. No global Docker/proxy configuration was modified or restarted.
-- At 17:52 CST the NAS load average was about 65 and `/proc/pressure/io` reported full I/O
-  pressure avg10 about 76%; multiple unrelated services were in D state and container queries
-  timed out. Scoped build/download attempts were stopped. This is an observation, not a
-  diagnosed storage root cause or authorization to repair unrelated NAS services.
-- An existing `/volume4/Docker/chrome/docker-compose.yaml` uses the locally available ARM64
-  `lscr.io/linuxserver/chromium:arm64v8-67a9c4d9-ls26` image, existing `/config`, and ZeroOmega.
-  Its declared flags have no CDP endpoint and its desktop port did not respond. Current container
-  state could not be confirmed because Docker inspect timed out. Reuse is under discussion;
-  the committed deployment has not yet been switched to that image/container/profile.
-- Gateway key is still required. The prepared `.env` contains no credentials.
+- Following user-authorized image reuse, both images built successfully on the ARM64 NAS.
+  Jev uses the existing LinuxServer Chromium image and the adapter uses local Node 22.
+- Both Compose services are healthy. The Inspector was opened from LAN at
+  `http://192.168.50.115:8766` and its real NAS browser successfully loaded Wikipedia's main page,
+  displayed its screenshot, title and 45 indexed elements. No model decision was made.
+- Container CDP returned `Chrome/146.0.7680.164`. Browser-harness doctor passed Chrome,
+  daemon and active connection checks. Its optional cloud-auth row says FAIL because no
+  Browser Use Cloud credentials are configured or needed.
+- Only `192.168.50.115:8766` is published; LAN access to 9222 failed as intended.
+  The Jev container is not privileged. The original `chromium` container remains stopped,
+  and no original profile/config/extensions are mounted into Jev.
+- Direct Wikipedia access failed. The scoped `CHROMIUM_PROXY_SERVER` setting uses the existing
+  NAS proxy and enabled successful page navigation. No global proxy or Docker settings changed.
+- Earlier Docker Hub pulls failed and the NAS showed substantial I/O pressure. At the later
+  successful build, I/O pressure had subsided. Reusing local images avoided those base-image pulls;
+  no unrelated NAS service was restarted or storage repair attempted.
+- `docker compose restart` completed; both containers returned healthy, doctor passed again,
+  and LAN Inspector returned HTTP 200. The adapter's unauthenticated model-list probe returned
+  Gateway HTTP 200, proving connectivity only.
+- Gateway key is still required. The prepared NAS `.env` contains no Gateway credentials.
+  Full Jev Wikipedia search, TYPE_TEXT generation and Gateway log verification remain pending.

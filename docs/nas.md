@@ -180,9 +180,19 @@ state, log rotation, and an explicit reproducible upgrade path, not unattended c
 - Python/Node registry manifests and uv manifest confirm ARM64 + AMD64 availability; Debian
   lists Chromium for both architectures. This is architecture evidence, not a successful image build.
 - NAS SSH, ARM64 architecture and Compose configuration parsing passed.
-- NAS Docker socket access failed; `sudo -n docker` requires a password. No containers were
-  started. `compose ps`, container doctor, LAN runtime UI, Wikipedia, Gateway logs, and restart
-  acceptance are **not verified**. The Dockerfile has not been built on this NAS.
-- NAS direct Docker Hub manifest access timed out; GHCR manifest access succeeded.
-  Restore NAS Docker Hub/proxy access before building. No unrelated NAS proxy settings changed.
+- Follow-up NAS sudo authentication succeeded. Initial `compose ps` returned an empty stack.
+  No Jev containers were started. Container doctor, LAN runtime UI, Wikipedia, Gateway logs,
+  and restart acceptance remain **not verified**; image builds have not completed.
+- BuildKit failed obtaining Docker Hub authentication tokens because NAS DNS returned an
+  unexpected IPv6 address. A scoped existing-proxy probe reached the registry, but subsequent
+  downloads timed out. No global Docker/proxy configuration was modified or restarted.
+- At 17:52 CST the NAS load average was about 65 and `/proc/pressure/io` reported full I/O
+  pressure avg10 about 76%; multiple unrelated services were in D state and container queries
+  timed out. Scoped build/download attempts were stopped. This is an observation, not a
+  diagnosed storage root cause or authorization to repair unrelated NAS services.
+- An existing `/volume4/Docker/chrome/docker-compose.yaml` uses the locally available ARM64
+  `lscr.io/linuxserver/chromium:arm64v8-67a9c4d9-ls26` image, existing `/config`, and ZeroOmega.
+  Its declared flags have no CDP endpoint and its desktop port did not respond. Current container
+  state could not be confirmed because Docker inspect timed out. Reuse is under discussion;
+  the committed deployment has not yet been switched to that image/container/profile.
 - Gateway key is still required. The prepared `.env` contains no credentials.

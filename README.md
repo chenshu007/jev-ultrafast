@@ -16,6 +16,36 @@ Give it one goal. [TypeSafe's Jev](https://docs.typesafe.ai/introduction) picks 
 
 [Watch the MP4](docs/demo.mp4) · [Measurements](docs/performance.md) · [Read the loop](jev_ultrafast/agent.py)
 
+## NAS fork: verified interface and deployment
+
+See [UGREEN NAS deployment, acceptance, upgrade and rollback](docs/nas.md). This fork adds
+provider selection, a small official-SDK adapter, LAN-safe Inspector hosting and Docker Compose.
+The core agent loop, browser executor, snapshot and question policy are unchanged.
+
+Research checked live on **2026-09-19**, before implementation:
+
+- jev-ultrafast upstream `1231850a0bf1a0c0341fe408ef1668dbbfdfac46` still calls
+  TypeSafe `/v1/systemone` directly. Its pinned browser-harness `0.1.13` is also the current
+  PyPI release; current harness main was `afbcc381b963040c19627d788e40c7e7663171ee`.
+- [Vercel evaluation documentation](https://vercel.com/docs/ai-gateway/modalities/evaluation)
+  explicitly requires AI SDK 7+; evaluation is **not** supported by OpenAI-compatible endpoints.
+  Live Gateway model discovery confirms `typesafe-ai/jev`, type `evaluation`, specification v4.
+  We pin `ai` 7.0.107 / `@ai-sdk/gateway` 4.0.87 and use `experimental_evaluate()` with
+  `gateway.evaluationModel()`. No unofficial Python copy of the evaluation wire protocol.
+- The text helper uses the official [Chat Completions base URL](https://vercel.com/docs/ai-gateway/sdks-and-apis/openai-chat-completions),
+  `https://ai-gateway.vercel.sh/v1`. Live discovery confirms `openai/gpt-5.4-nano`, supporting
+  reasoning `none`; [OpenAI's model reference](https://developers.openai.com/api/docs/models/gpt-5.4-nano)
+  confirms structured outputs. It is the configurable low-cost/speed-oriented default.
+- browser-harness resolves `BU_CDP_URL` via `/json/version` and uses the returned WebSocket URL
+  without hostname rewriting. We use dedicated Chromium and loopback CDP in the Jev container.
+  [Chrome requires a non-default profile for remote debugging](https://developer.chrome.com/blog/remote-debugging-port);
+  [headless mode](https://developer.chrome.com/docs/automation-and-testing/headless) is supported.
+- [Gateway tags](https://vercel.com/docs/ai-gateway/observability-and-spend/custom-reporting)
+  use `providerOptions.gateway.tags` on both APIs. Reporting can incur separate charges.
+
+The historical benchmark claims below are upstream results, not NAS/Gateway acceptance results.
+Current deployment limitations and pending live checks are explicitly recorded in the NAS guide.
+
 ## The action space
 
 Every observation produces a new element table:

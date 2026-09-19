@@ -4,6 +4,7 @@ import signal
 import subprocess
 import time
 from pathlib import Path
+from urllib.parse import urlparse
 
 from healthcheck import check
 
@@ -25,11 +26,18 @@ try:
     # Browser receives no model credentials. It never uses a personal or host Chrome profile.
     browser_env = {k: v for k, v in os.environ.items() if not any(
         word in k for word in ("KEY", "TOKEN", "SECRET", "PASSWORD"))}
-    children.append(subprocess.Popen([
+    chrome_command = [
         "chromium", "--headless=new", "--no-sandbox", "--remote-debugging-address=127.0.0.1",
         "--remote-debugging-port=9222", "--user-data-dir=/data/chrome", "--no-first-run",
         "--no-default-browser-check", "about:blank",
-    ], env=browser_env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
+    ]
+    if proxy := os.environ.get("CHROMIUM_PROXY_SERVER"):
+        chrome_command.append("--proxy-server=" + proxy)
+        public_host = urlparse(os.environ.get("JEV_PUBLIC_ORIGIN", "")).hostname or "localhost"
+        chrome_command.append("--proxy-bypass-list=localhost;127.0.0.1;[::1];" + public_host)
+    children.append(subprocess.Popen(
+        chrome_command, env=browser_env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    ))
     children.append(subprocess.Popen(["jev"]))
     started, last_check, failures = time.monotonic(), 0, 0
     while not stopping and all(child.poll() is None for child in children):

@@ -6,7 +6,11 @@ x-logging: &logging
     max-file: "3"
 services:
   jev:
-    build: .
+    build:
+      context: .
+      args:
+        CHROMIUM_IMAGE: ${CHROMIUM_IMAGE:-lscr.io/linuxserver/chromium:arm64v8-67a9c4d9-ls26}
+    init: true
     image: jev-ultrafast-nas:${JEV_IMAGE_TAG:-local}
     restart: unless-stopped
     env_file: .env
@@ -16,6 +20,8 @@ services:
       BH_RECORD: "0"
     ports:
       - "${NAS_LAN_IP:?Set NAS_LAN_IP in .env}:8766:8766"
+    tmpfs:
+      - /config:uid=911,gid=1000,mode=0700
     shm_size: 1gb
     volumes:
       - chrome-profile:/data/chrome

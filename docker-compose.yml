@@ -1,0 +1,57 @@
+name: jev-ultrafast
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+services:
+  jev:
+    build: .
+    image: jev-ultrafast-nas:${JEV_IMAGE_TAG:-local}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      BH_HOME: /data/harness
+      BH_RUNTIME_DIR: /tmp/harness-runtime
+      BH_RECORD: "0"
+    ports:
+      - "${NAS_LAN_IP:?Set NAS_LAN_IP in .env}:8766:8766"
+    shm_size: 1gb
+    volumes:
+      - chrome-profile:/data/chrome
+      - harness-state:/data/harness
+      - artifacts:/app/artifacts
+    healthcheck:
+      test: ["CMD", "python", "docker/healthcheck.py"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+    depends_on:
+      gateway-adapter:
+        condition: service_healthy
+    stop_grace_period: 30s
+    logging: *logging
+    networks: [gateway]
+  gateway-adapter:
+    build: ./gateway-adapter
+    image: jev-gateway-adapter:${JEV_IMAGE_TAG:-local}
+    restart: unless-stopped
+    environment:
+      AI_GATEWAY_API_KEY: ${AI_GATEWAY_API_KEY:-}
+      AI_GATEWAY_API_KEY_FILE: ${AI_GATEWAY_API_KEY_FILE:-}
+      JEV_MODEL: ${JEV_MODEL:-typesafe-ai/jev}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8767/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging: *logging
+    networks: [gateway]
+networks:
+  # Private bridge with outbound internet for websites and Gateway; no CDP/adapter ports published.
+  gateway:
+volumes:
+  chrome-profile:
+  harness-state:
+  artifacts:

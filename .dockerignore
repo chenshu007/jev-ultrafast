@@ -1,0 +1,16 @@
+.git
+.env
+.env.*
+.venv
+node_modules
+**/node_modules
+**/__pycache__
+**/.pytest_cache
+**/.ruff_cache
+artifacts
+dist
+gateway-adapter/dist
+secrets
+chrome-profile
+browser-harness-state
+docs

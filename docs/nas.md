@@ -194,7 +194,7 @@ state, log rotation, and an explicit reproducible upgrade path, not unattended c
   Jev uses the existing LinuxServer Chromium image and the adapter uses local Node 22.
 - Both Compose services are healthy. The Inspector was opened from LAN at
   `http://192.168.50.115:8766` and its real NAS browser successfully loaded Wikipedia's main page,
-  displayed its screenshot, title and 45 indexed elements. No model decision was made.
+  displayed its screenshot, title and 45 indexed elements. Full model acceptance followed below.
 - Container CDP returned `Chrome/146.0.7680.164`. Browser-harness doctor passed Chrome,
   daemon and active connection checks. Its optional cloud-auth row says FAIL because no
   Browser Use Cloud credentials are configured or needed.
@@ -209,5 +209,26 @@ state, log rotation, and an explicit reproducible upgrade path, not unattended c
 - `docker compose restart` completed; both containers returned healthy, doctor passed again,
   and LAN Inspector returned HTTP 200. The adapter's unauthenticated model-list probe returned
   Gateway HTTP 200, proving connectivity only.
-- Gateway key is still required. The prepared NAS `.env` contains no Gateway credentials.
-  Full Jev Wikipedia search, TYPE_TEXT generation and Gateway log verification remain pending.
+- The user supplied the Gateway key through the ignored local `.env`; it was transferred to
+  the private NAS `.env` without printing it. Both files have mode 0600. Services were recreated.
+- CLI Wikipedia acceptance passed in 10.884 seconds: 5 decision calls, 2 TYPE_TEXT calls.
+  Independent DOM checks confirmed h1 `Gödel's incompleteness theorems`, the exact article URL,
+  and title `Gödel's incompleteness theorems - Wikipedia`.
+- Gateway dashboard Logs independently showed all seven requests with HTTP 200, model
+  `typesafe-ai/jev` (5) and `openai/gpt-5.4-nano` (2), at 10:49:55–10:50:04 UTC.
+  The TypeSafe provider label on Gateway rows identifies the routed provider, not a direct
+  fallback. The adapter has no automatic direct fallback.
+- After another Compose restart, both services became healthy and doctor again passed all
+  local-browser checks. A task started from the LAN Inspector searched and opened the article
+  with 2 browser actions and 1 TYPE_TEXT call. Its final screenshot initially hit the harness
+  5-second timeout, pausing the UI. Resuming completed successfully with 4 total decisions;
+  elapsed time was 87.026 seconds including the manual inspection/pause. Independent CDP
+  confirmed the article h1/title/URL. Do not interpret this as an uninterrupted GUI timing result.
+  Gateway Logs also showed the restarted run's decision and helper requests with HTTP 200.
+- The Custom Reporting endpoint returned HTTP 403 for this account; dashboard Logs were used
+  for verification instead. Text responses reported total Gateway costs $0.0003804 and
+  $0.0003848 for the first run, including $0.000225 tag-write cost per text call. The dashboard
+  displayed Jev rows as $0; this rounded display is not a guarantee of permanent free pricing.
+- Remaining limitations: occasional screenshot timeout can require Resume; the inherited
+  Chromium version needs intentional security updates/rebuilds; LAN HTTP is intended only for
+  a trusted LAN. No uninterrupted long-duration soak test has been completed.

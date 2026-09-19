@@ -44,7 +44,8 @@ Research checked live on **2026-09-19**, before implementation:
   use `providerOptions.gateway.tags` on both APIs. Reporting can incur separate charges.
 
 The historical benchmark claims below are upstream results, not NAS/Gateway acceptance results.
-Current deployment limitations and pending live checks are explicitly recorded in the NAS guide.
+ARM64 NAS deployment, live Wikipedia acceptance, Gateway dashboard verification and restart checks
+are recorded in the NAS guide, including a recovered screenshot timeout during the GUI test.
 
 ## The action space
 
